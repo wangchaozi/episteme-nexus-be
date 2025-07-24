@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/episteme-nexus-be/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "tsConfigPath": "apps/episteme-nexus-be/tsconfig.app.json"
+  },
+  "monorepo": true,
+  "root": "apps/episteme-nexus-be",
+  "projects": {
+    "episteme-nexus-be": {
+      "type": "application",
+      "root": "apps/episteme-nexus-be",
+      "entryFile": "main",
+      "sourceRoot": "apps/episteme-nexus-be/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/episteme-nexus-be/tsconfig.app.json"
+      }
+    },
+    "user": {
+      "type": "application",
+      "root": "apps/user",
+      "entryFile": "main",
+      "sourceRoot": "apps/user/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/user/tsconfig.app.json"
+      }
+    },
+    "knowledge-base": {
+      "type": "application",
+      "root": "apps/knowledge-base",
+      "entryFile": "main",
+      "sourceRoot": "apps/knowledge-base/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/knowledge-base/tsconfig.app.json"
+      }
+    },
+    "prisma": {
+      "type": "library",
+      "root": "libs/prisma",
+      "entryFile": "index",
+      "sourceRoot": "libs/prisma/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/prisma/tsconfig.lib.json"
+      }
+    },
+    "redis": {
+      "type": "library",
+      "root": "libs/redis",
+      "entryFile": "index",
+      "sourceRoot": "libs/redis/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/redis/tsconfig.lib.json"
+      }
+    }
+  }
+}
