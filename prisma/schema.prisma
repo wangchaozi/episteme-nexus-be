@@ -1,9 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// This is your Prisma schema file
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -14,11 +9,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户模型
 model User {
-  id  Int @id @default(autoincrement())
-  username String @db.VarChar(50) @unique
-  password String @db.VarChar(50)
-  email String @db.VarChar(50)
-  createTime DateTime @default(now())
-  updateTime DateTime @updatedAt
+  id             Int                @id @default(autoincrement())
+  username       String             @db.VarChar(50) @unique // 账号名（唯一）
+  password       String             @db.VarChar(255) // 存储哈希后的密码
+  email          String             @db.VarChar(50) @unique // 邮箱（唯一）
+  wechatOpenId   String?            @db.VarChar(100) @unique // 微信开放平台ID（可选）
+  avatar         String?            @db.VarChar(255) // 头像URL
+  refreshToken   String?            @db.Text // 无感刷新令牌
+  createTime     DateTime           @default(now())
+  updateTime     DateTime           @updatedAt
+
+  // 关联关系
+  createdKnowledgeBases KnowledgeBase[] // 用户创建的知识库
+  createdDocuments      Document[]      @relation("CreatedDocuments") // 用户创建的文档
+  editedDocuments       Document[]      @relation("EditedDocuments") // 用户编辑的文档（通过lastEditorId关联）
+  createdTags           Tag[]           // 用户创建的标签
+
+  DocumentVersion DocumentVersion[]
+}
+
+// 知识库模型
+model KnowledgeBase {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(255) // 知识库名称
+  description     String?           @db.Text // 知识库描述
+  creatorId       Int               // 创建者ID
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  isDeleted       Int               @default(0) // 逻辑删除
+  isPublic        Int               @default(0) // 是否公开（0-私有，1-公开）
+  coverImage      String?           @db.VarChar(255) // 封面图URL
+  viewCount       Int               @default(0) // 访问次数
+  starCount       Int               @default(0) // 星标次数
+  lastActiveTime  DateTime          @default(now()) // 最后活跃时间
+
+  // 关联关系
+  creator         User              @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  directories     Directory[]       // 知识库下的目录
+  documents       Document[]        // 知识库下的文档（无目录时直接关联）
+}
+
+// 目录模型
+model Directory {
+  id                Int               @id @default(autoincrement())
+  name              String            @db.VarChar(255) // 目录名称
+  knowledgeBaseId   Int               // 所属知识库ID
+  parentId          Int?              // 父目录ID（自关联，顶级目录为null）
+  sortOrder         Int               @default(0) // 排序序号
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  isDeleted         Int               @default(0) // 逻辑删除
+  isExpanded        Int               @default(1) // 是否展开（0-折叠，1-展开）
+  description       String?           @db.VarChar(500) // 目录描述
+
+  // 关联关系
+  knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  parent            Directory?        @relation("DirectoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children          Directory[]       @relation("DirectoryHierarchy") // 子目录
+  documents         Document[]        // 目录下的文档
+}
+
+// 文档模型
+model Document {
+  id                Int               @id @default(autoincrement())
+  title             String            @db.VarChar(255) // 文档标题
+  content           String?           @db.LongText // 富文本内容
+  knowledgeBaseId   Int               // 所属知识库ID
+  directoryId       Int?              // 所属目录ID（无目录时为null）
+  creatorId         Int               // 创建者ID
+  lastEditorId      Int               // 最后编辑者ID
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  isDeleted         Int               @default(0) // 逻辑删除
+  contentType       String            @db.VarChar(20) @default("markdown") // 内容类型（markdown/html）
+  isDraft           Int               @default(0) // 是否草稿（0-已发布，1-草稿）
+  wordCount         Int               @default(0) // 字数统计
+  viewCount         Int               @default(0) // 查看次数
+  favoriteCount     Int               @default(0) // 收藏次数
+
+  // 关联关系
+  knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  directory         Directory?        @relation(fields: [directoryId], references: [id], onDelete: SetNull)
+  creator           User              @relation("CreatedDocuments", fields: [creatorId], references: [id])
+  lastEditor        User              @relation("EditedDocuments", fields: [lastEditorId], references: [id])
+  versions          DocumentVersion[] // 文档的历史版本
+  documentTags      DocumentTag[]     // 关联的标签
+}
+
+// 文档版本模型
+model DocumentVersion {
+  id             Int       @id @default(autoincrement())
+  documentId     Int       // 关联文档ID
+  content        String?   @db.LongText // 该版本的内容
+  editorId       Int       // 编辑者ID
+  versionNumber  Int       // 版本号（从1开始递增）
+  createdAt      DateTime  @default(now())
+  isDeleted      Int       @default(0) // 逻辑删除
+  changeNote     String?   @db.VarChar(500) // 版本变更说明
+
+  // 关联关系
+  document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  editor         User      @relation(fields: [editorId], references: [id])
+}
+
+// 标签模型
+model Tag {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(100) @unique // 标签名称（唯一）
+  creatorId   Int           // 创建者ID
+  createdAt   DateTime      @default(now())
+  isDeleted   Int           @default(0) // 逻辑删除
+  color       String        @db.VarChar(20) @default("#CCCCCC") // 标签颜色
+  useCount    Int           @default(0) // 被使用次数
+
+  // 关联关系
+  creator     User          @relation(fields: [creatorId], references: [id])
+  documentTags DocumentTag[] // 关联的文档
+}
+
+// 文档-标签关联模型（多对多）
+model DocumentTag {
+  id          Int       @id @default(autoincrement())
+  documentId  Int       // 文档ID
+  tagId       Int       // 标签ID
+  createdAt   DateTime  @default(now())
+  isDeleted   Int       @default(0) // 逻辑删除
+
+  // 关联关系
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  // 联合唯一约束（避免重复关联）
+  @@unique([documentId, tagId])
 }

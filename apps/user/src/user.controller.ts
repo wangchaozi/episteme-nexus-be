@@ -14,6 +14,7 @@ import { EmailService } from '@app/email';
 import { LoginUserDto } from './dto/login-user.dto';
 import { JwtService } from '@nestjs/jwt';
 import { UpdateUserPasswordDto } from './dto/update-user-password.dto';
+import { RequireLogin, UserInfo } from '@app/common';
 
 @Controller('user')
 export class UserController {
@@ -89,5 +90,13 @@ export class UserController {
       html: `<p>你的更改密码验证码是 ${code}</p>`,
     });
     return '发送成功';
+  }
+
+  @Get('aaa')
+  @RequireLogin()
+  // @SetMetadata('require-login', true)
+  aaa(@UserInfo() userInfo, @UserInfo('username') username) {
+    console.log(userInfo, username);
+    return 'aaa';
   }
 }
