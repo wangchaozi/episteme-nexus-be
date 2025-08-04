@@ -9,82 +9,90 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 用户模型
+// 用户模型（整合账号体系与考试关联）
 model User {
   id             Int                @id @default(autoincrement())
   username       String             @db.VarChar(50) @unique // 账号名（唯一）
-  password       String             @db.VarChar(255) // 存储哈希后的密码
+  password       String             @db.VarChar(255) // 哈希后的密码
   email          String             @db.VarChar(50) @unique // 邮箱（唯一）
-  wechatOpenId   String?            @db.VarChar(100) @unique // 微信开放平台ID（可选）
+  wechatOpenId   String?            @db.VarChar(100) @unique // 微信登录ID
   avatar         String?            @db.VarChar(255) // 头像URL
   refreshToken   String?            @db.Text // 无感刷新令牌
   createTime     DateTime           @default(now())
   updateTime     DateTime           @updatedAt
 
-  // 关联关系
-  createdKnowledgeBases KnowledgeBase[] // 用户创建的知识库
-  createdDocuments      Document[]      @relation("CreatedDocuments") // 用户创建的文档
-  editedDocuments       Document[]      @relation("EditedDocuments") // 用户编辑的文档（通过lastEditorId关联）
-  createdTags           Tag[]           // 用户创建的标签
+  // 关联关系（整合知识库与考试）
+  createdKnowledgeBases KnowledgeBase[] // 创建的知识库
+  createdDocuments      Document[]      @relation("CreatedDocuments") // 创建的文档
+  editedDocuments       Document[]      @relation("EditedDocuments") // 编辑的文档
+  createdTags           Tag[]           // 创建的标签
+  createdExams          Exam[]          // 创建的试卷
+  userExams             UserExam[]      // 参与的考试
+  userAnswers           UserAnswer[]    // 答题记录
+  documentVersions      DocumentVersion[] // 编辑的文档版本
 
-  DocumentVersion DocumentVersion[]
+  DocumentVersion DocumentVersion[] @relation(name: "DocumentVersionEditor")
+
+  Question Question[]
 }
 
-// 知识库模型
+// 知识库模型（整合基础信息与考试关联）
 model KnowledgeBase {
   id              Int               @id @default(autoincrement())
   name            String            @db.VarChar(255) // 知识库名称
-  description     String?           @db.Text // 知识库描述
+  description     String?           @db.Text // 描述
   creatorId       Int               // 创建者ID
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
-  isDeleted       Int               @default(0) // 逻辑删除
-  isPublic        Int               @default(0) // 是否公开（0-私有，1-公开）
-  coverImage      String?           @db.VarChar(255) // 封面图URL
+  isDeleted       Int               @default(0) // 逻辑删除（0-未删，1-已删）
+  isPublic        Int               @default(0) // 公开状态（0-私有，1-公开）
+  coverImage      String?           @db.VarChar(255) // 封面图
   viewCount       Int               @default(0) // 访问次数
   starCount       Int               @default(0) // 星标次数
   lastActiveTime  DateTime          @default(now()) // 最后活跃时间
 
-  // 关联关系
+  // 关联关系（整合文档与考试题目）
   creator         User              @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  directories     Directory[]       // 知识库下的目录
-  documents       Document[]        // 知识库下的文档（无目录时直接关联）
+  directories     Directory[]       // 包含的目录
+  documents       Document[]        // 包含的文档
+  questions       Question[]        // 包含的题目（考试系统）
+  examRelations   ExamKnowledgeBase[] // 关联的试卷（多对多）
 }
 
-// 目录模型
+// 目录模型（保留层级结构）
 model Directory {
   id                Int               @id @default(autoincrement())
   name              String            @db.VarChar(255) // 目录名称
   knowledgeBaseId   Int               // 所属知识库ID
-  parentId          Int?              // 父目录ID（自关联，顶级目录为null）
+  parentId          Int?              // 父目录ID（自关联）
   sortOrder         Int               @default(0) // 排序序号
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   isDeleted         Int               @default(0) // 逻辑删除
-  isExpanded        Int               @default(1) // 是否展开（0-折叠，1-展开）
+  isExpanded        Int               @default(1) // 默认展开状态（0-折叠，1-展开）
   description       String?           @db.VarChar(500) // 目录描述
 
   // 关联关系
   knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   parent            Directory?        @relation("DirectoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children          Directory[]       @relation("DirectoryHierarchy") // 子目录
-  documents         Document[]        // 目录下的文档
+  documents         Document[]        // 包含的文档
 }
 
-// 文档模型
+// 文档模型（整合富文本与版本管理）
 model Document {
   id                Int               @id @default(autoincrement())
-  title             String            @db.VarChar(255) // 文档标题
+  title             String            @db.VarChar(255) // 标题
   content           String?           @db.LongText // 富文本内容
   knowledgeBaseId   Int               // 所属知识库ID
-  directoryId       Int?              // 所属目录ID（无目录时为null）
+  directoryId       Int?              // 所属目录ID
   creatorId         Int               // 创建者ID
   lastEditorId      Int               // 最后编辑者ID
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   isDeleted         Int               @default(0) // 逻辑删除
-  contentType       String            @db.VarChar(20) @default("markdown") // 内容类型（markdown/html）
-  isDraft           Int               @default(0) // 是否草稿（0-已发布，1-草稿）
+  contentType       String            @db.VarChar(20) @default("markdown") // 内容格式（markdown/html）
+  isDraft           Int               @default(0) // 草稿状态（0-发布，1-草稿）
   wordCount         Int               @default(0) // 字数统计
   viewCount         Int               @default(0) // 查看次数
   favoriteCount     Int               @default(0) // 收藏次数
@@ -94,39 +102,41 @@ model Document {
   directory         Directory?        @relation(fields: [directoryId], references: [id], onDelete: SetNull)
   creator           User              @relation("CreatedDocuments", fields: [creatorId], references: [id])
   lastEditor        User              @relation("EditedDocuments", fields: [lastEditorId], references: [id])
-  versions          DocumentVersion[] // 文档的历史版本
-  documentTags      DocumentTag[]     // 关联的标签
+  versions          DocumentVersion[] // 历史版本
+  documentTags      DocumentTag[]     // 关联的标签（多对多）
 }
 
-// 文档版本模型
+// 文档版本模型（保留变更记录）
 model DocumentVersion {
   id             Int       @id @default(autoincrement())
   documentId     Int       // 关联文档ID
-  content        String?   @db.LongText // 该版本的内容
+  content        String?   @db.LongText // 版本内容
   editorId       Int       // 编辑者ID
-  versionNumber  Int       // 版本号（从1开始递增）
+  versionNumber  Int       // 版本号（递增）
   createdAt      DateTime  @default(now())
   isDeleted      Int       @default(0) // 逻辑删除
-  changeNote     String?   @db.VarChar(500) // 版本变更说明
+  changeNote     String?   @db.VarChar(500) // 变更说明（如"补充ES6内容"）
 
   // 关联关系
   document       Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  editor         User      @relation(fields: [editorId], references: [id])
+  editor         User      @relation(fields: [editorId], references: [id], name: "DocumentVersionEditor")
+
+  User User[]
 }
 
-// 标签模型
+// 标签模型（整合颜色与使用统计）
 model Tag {
   id          Int           @id @default(autoincrement())
   name        String        @db.VarChar(100) @unique // 标签名称（唯一）
   creatorId   Int           // 创建者ID
   createdAt   DateTime      @default(now())
   isDeleted   Int           @default(0) // 逻辑删除
-  color       String        @db.VarChar(20) @default("#CCCCCC") // 标签颜色
+  color       String        @db.VarChar(20) @default("#CCCCCC") // 标签颜色（如#FF5733）
   useCount    Int           @default(0) // 被使用次数
 
   // 关联关系
   creator     User          @relation(fields: [creatorId], references: [id])
-  documentTags DocumentTag[] // 关联的文档
+  documentTags DocumentTag[] // 关联的文档（多对多）
 }
 
 // 文档-标签关联模型（多对多）
@@ -143,4 +153,119 @@ model DocumentTag {
 
   // 联合唯一约束（避免重复关联）
   @@unique([documentId, tagId])
+}
+
+// 题目模型（考试系统核心）
+model Question {
+  id                Int               @id @default(autoincrement())
+  content           String            @db.Text // 题目内容（如"React生命周期有哪些？"）
+  answer            String            @db.LongText // 参考答案（富文本）
+  type              String            @db.VarChar(20) // 类型（single/multiple/short/essay）
+  difficulty        Int               @default(1) // 难度（1-简单，2-中等，3-困难）
+  knowledgeBaseId   Int               // 所属知识库ID
+  creatorId         Int               // 创建者ID
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  isDeleted         Int               @default(0) // 逻辑删除
+  options           String?           @db.Text // 选择题选项（JSON格式，如[{"id":"A","content":"选项A"}]）
+
+  // 关联关系
+  knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  creator           User              @relation(fields: [creatorId], references: [id])
+  examRelations     ExamQuestion[]    // 关联的试卷（多对多）
+  userAnswers       UserAnswer[]      // 用户答题记录
+}
+
+// 试卷模型（整合多知识库题目）
+model Exam {
+  id          Int                 @id @default(autoincrement())
+  title       String              @db.VarChar(255) // 试卷标题
+  description String?             @db.Text // 描述
+  creatorId   Int                 // 创建者ID
+  isPublished Int                 @default(0) // 发布状态（0-草稿，1-发布）
+  duration    Int                 @default(60) // 考试时长（分钟）
+  passingScore Float              @default(60) // 及格分数
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  isDeleted   Int                 @default(0) // 逻辑删除
+
+  // 关联关系
+  creator     User                @relation(fields: [creatorId], references: [id])
+  knowledgeBases ExamKnowledgeBase[] // 关联的知识库（多对多）
+  questions   ExamQuestion[]      // 包含的题目（多对多）
+  userExams   UserExam[]          // 用户参与记录
+}
+
+// 试卷-知识库关联模型（支持多知识库组合）
+model ExamKnowledgeBase {
+  id              Int           @id @default(autoincrement())
+  examId          Int           // 试卷ID
+  knowledgeBaseId Int           // 知识库ID
+  questionCount   Int           @default(0) // 从该知识库抽取的题目数量
+  questionTypes   String?       @db.VarChar(100) // 抽取的题目类型（如"single,multiple"）
+  difficultyLevel Int?          // 抽取难度（1-3）
+  createdAt       DateTime      @default(now())
+
+  // 关联关系
+  exam            Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  // 联合唯一约束
+  @@unique([examId, knowledgeBaseId])
+}
+
+// 试卷-题目关联模型（定义题目顺序与分值）
+model ExamQuestion {
+  id          Int       @id @default(autoincrement())
+  examId      Int       // 试卷ID
+  questionId  Int       // 题目ID
+  score       Float     @default(10) // 题目分值
+  sortOrder   Int       @default(0) // 展示顺序
+  createdAt   DateTime  @default(now())
+
+  // 关联关系
+  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // 联合唯一约束（避免题目重复）
+  @@unique([examId, questionId])
+}
+
+// 用户-试卷关联模型（记录考试状态）
+model UserExam {
+  id          Int       @id @default(autoincrement())
+  userId      Int       // 用户ID
+  examId      Int       // 试卷ID
+  score       Float?    // 总分（null-未提交）
+  submitTime  DateTime? // 提交时间（null-未提交）
+  startTime   DateTime  @default(now()) // 开始时间
+  isCompleted Int       @default(0) // 完成状态（0-进行中，1-已完成）
+  isPassed    Int?      // 是否通过（null-未判分，0-未通过，1-通过）
+
+  // 关联关系
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userAnswers UserAnswer[] // 答题详情
+
+  // 联合唯一约束（同一用户不可重复考同一试卷）
+  @@unique([userId, examId])
+}
+
+// 用户答题记录模型（判分依据）
+model UserAnswer {
+  id          Int         @id @default(autoincrement())
+  userExamId  Int         // 关联的用户考试ID
+  questionId  Int         // 题目ID
+  userAnswer  String?     @db.LongText // 用户答案（JSON格式，如["A","B"]）
+  isCorrect   Int?        // 正确性（null-未判分，0-错误，1-正确）
+  score       Float?      // 本题得分
+  createdAt   DateTime    @default(now())
+
+  // 关联关系
+  userExam    UserExam    @relation(fields: [userExamId], references: [id], onDelete: Cascade)
+  question    Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  // 联合唯一约束（同一考试中同一题目仅一条记录）
+  @@unique([userExamId, questionId])
+  User User[]
 }

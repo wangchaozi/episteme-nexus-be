@@ -7,11 +7,8 @@ export class KnowledgeBaseService {
   @Inject(PrismaService)
   private prismaService: PrismaService;
 
-  async createKnowledgeBase(
-    knowledgeBase: KnowledgeBaseDto,
-    userId: number,
-  ): Promise<string> {
-    await this.prismaService.knowledgeBase.create({
+  async createKnowledgeBase(knowledgeBase: KnowledgeBaseDto, userId: number) {
+    return this.prismaService.knowledgeBase.create({
       data: {
         ...knowledgeBase,
         creator: {
@@ -21,11 +18,9 @@ export class KnowledgeBaseService {
         },
       },
     });
-    return 'Knowledge Base Created!';
   }
 
   async knowledgeBaseList(userId: number) {
-    console.log(userId);
     return this.prismaService.knowledgeBase.findMany({
       where: {
         creatorId: userId,

@@ -8,6 +8,7 @@ import { RequireLogin, UserInfo } from '@app/common';
 export class KnowledgeBaseController {
   constructor(private readonly knowledgeBaseService: KnowledgeBaseService) {}
 
+  // 创建文章
   @Post('create')
   async createKnowledgeBase(
     @Body() knowledgeBaseDto: KnowledgeBaseDto,
@@ -19,8 +20,12 @@ export class KnowledgeBaseController {
     );
   }
 
+  // 获取文章列表
+  // TODO: 分页
   @Get('list')
   async knowledgeBaseList(@UserInfo('userId') userId: number) {
     return this.knowledgeBaseService.knowledgeBaseList(userId);
   }
+
+  // 获取知识库详情
 }
