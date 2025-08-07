@@ -3,7 +3,7 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseDto } from './dto/knowledge-base.dto';
 import { RequireLogin, UserInfo } from '@app/common';
 
-@Controller('knowledge-base')
+@Controller('knowledge')
 @RequireLogin()
 export class KnowledgeBaseController {
   constructor(private readonly knowledgeBaseService: KnowledgeBaseService) {}
