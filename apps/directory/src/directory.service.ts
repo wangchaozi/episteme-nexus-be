@@ -19,6 +19,7 @@ export class DirectoryService {
     createDirectoryDto: CreateDirectoryDto,
     userId: number,
   ) {
+    console.log(userId);
     const kb = await this.prismaService.knowledgeBase.findUnique({
       where: { id: knowledgeBaseId, isDeleted: 0, creatorId: userId },
     });

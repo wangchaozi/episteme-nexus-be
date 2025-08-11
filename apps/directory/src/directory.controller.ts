@@ -1,13 +1,18 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { DirectoryService } from './directory.service';
 import { CreateDirectoryDto } from './dto/create-directory.dto';
-import { UserInfo } from '@app/common';
+import { RequireLogin, UserInfo } from '@app/common';
 import { UpdateDirectoryDto } from './dto/update-directory.dto';
-
 @Controller()
+@RequireLogin()
 export class DirectoryController {
   constructor(private readonly directoryService: DirectoryService) {}
 
+  // hello
+  @Get()
+  root() {
+    return 'directory root';
+  }
   // 创建目录
   @Post('knowledge-bases/:knowledgeBaseId/directories')
   async createDirectories(
@@ -15,7 +20,7 @@ export class DirectoryController {
     @Body() createDirectoryDto: CreateDirectoryDto,
     @UserInfo('userId') userId: number,
   ) {
-    return this.directoryService.createDirectories(
+    return await this.directoryService.createDirectories(
       knowledgeBaseId,
       createDirectoryDto,
       userId,
